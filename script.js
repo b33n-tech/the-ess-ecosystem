@@ -13,42 +13,41 @@ function displayCards(sources) {
   container.innerHTML = '';
 
   sources.forEach(source => {
-    const sourceEl = document.createElement('div');
-    sourceEl.classList.add('card');
+    const card = document.createElement('div');
+    card.className = 'card';
 
-    const sourceTitle = document.createElement('h2');
-    sourceTitle.textContent = source.name;
-    sourceEl.appendChild(sourceTitle);
+    const title = document.createElement('h2');
+    title.textContent = source.name;
+    card.appendChild(title);
 
-    const sourceDesc = document.createElement('p');
-    sourceDesc.textContent = source.desc;
-    sourceEl.appendChild(sourceDesc);
+    const desc = document.createElement('p');
+    desc.textContent = source.desc;
+    card.appendChild(desc);
 
     // tags
     const tagContainer = document.createElement('div');
     source.tags.forEach(tag => {
       const span = document.createElement('span');
-      span.classList.add('tag');
+      span.className = 'tag';
       span.textContent = tag;
       tagContainer.appendChild(span);
     });
-    sourceEl.appendChild(tagContainer);
+    card.appendChild(tagContainer);
 
-    // liens + appels à projets
-    const list = document.createElement('ul');
+    // appels à projet
     source.calls.forEach(call => {
-      const item = document.createElement('li');
-      item.innerHTML = `
-        <p><strong>${call.title}</strong><br>
-        <small>📅 Date limite : ${call.deadline}</small><br>
-        <a href="${call.url}" target="_blank">Lien</a></p>
+      const callDiv = document.createElement('div');
+      callDiv.className = 'call';
+      callDiv.innerHTML = `
+        <p><strong>${call.title}</strong></p>
+        <p>📅 Date limite : ${call.deadline}</p>
         <p>${call.note}</p>
+        <p><a href="${call.url}" target="_blank">Voir le projet</a></p>
       `;
-      list.appendChild(item);
+      card.appendChild(callDiv);
     });
-    sourceEl.appendChild(list);
 
-    container.appendChild(sourceEl);
+    container.appendChild(card);
   });
 }
 
