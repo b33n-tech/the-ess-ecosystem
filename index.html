@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Plateforme - Appels à projets (Prototype)</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#fff; --muted:#666; --accent:#111827;
+    --accent-2:#0ea5a4;
+  }
+  body{font-family:Inter,system-ui,Arial;margin:0;background:var(--bg);color:#0f172a}
+  header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;background:linear-gradient(90deg,#fff 0%,#f8fafc 100%);box-shadow:0 2px 10px rgba(2,6,23,0.04)}
+  h1{margin:0;font-size:1.05rem}
+  .controls{display:flex;gap:.5rem;align-items:center}
+  input[type="search"]{padding:.5rem .75rem;border-radius:10px;border:1px solid #e6eef0;min-width:240px}
+  main{padding:1.25rem}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem}
+  .source-card{background:var(--card);padding:1rem;border-radius:12px;box-shadow:0 8px 24px rgba(2,6,23,0.06);cursor:pointer;border:1px solid rgba(2,6,23,0.03)}
+  .source-card h3{margin:.1rem 0 .4rem;font-size:1rem}
+  .source-card p{margin:0;color:var(--muted);font-size:.88rem}
+  .meta{font-size:.8rem;color:var(--muted);margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap}
+  .tag{background:#eef2f2;padding:.18rem .45rem;border-radius:999px;font-size:.78rem;border:1px solid rgba(2,6,23,0.03)}
+  #detail{position:fixed;right:0;top:0;height:100%;width:420px;max-width:95%;background:#fff;box-shadow:-10px 0 30px rgba(2,6,23,0.12);transform:translateX(110%);transition:transform .25s ease;padding:1rem;overflow:auto;z-index:60}
+  #detail.open{transform:translateX(0)}
+  #detail header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+  .call{border-radius:10px;padding:.75rem;background:#fafafa;margin-bottom:.6rem;border:1px solid rgba(2,6,23,0.04)}
+  .call h4{margin:0 0 .25rem;font-size:.98rem}
+  .call .meta{margin-top:.4rem}
+  .small{font-size:.85rem;color:var(--muted)}
+  footer.note{margin-top:1rem;color:#9ca3af;font-size:.86rem}
+  /* Admin */
+  .admin-panel{display:none;padding:1rem}
+  .admin-panel.open{display:block}
+  textarea.json-edit{width:100%;height:320px;border-radius:8px;padding:1rem;border:1px solid #e6eef0;background:#fff;font-family:monospace;white-space:pre-wrap}
+  .btn{padding:.48rem .7rem;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(2,6,23,0.06)}
+  .row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem}
+  .kbd{background:#111;color:#fff;padding:2px 6px;border-radius:6px;font-size:.82rem}
+  .empty{color:var(--muted);text-align:center;padding:3rem;border:1px dashed rgba(2,6,23,0.05);border-radius:8px}
+  @media (max-width:700px){ header{flex-direction:column;gap:.6rem;align-items:flex-start} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Plateforme — Appels à projets</h1>
+    <div style="font-size:.86rem;color:var(--muted)">Prototype statique — public + admin (export JSON)</div>
+  </div>
+
+  <div class="controls">
+    <input id="q" type="search" placeholder="Rechercher titre / tag..." />
+    <select id="tagFilter"><option value="">Tous tags</option></select>
+    <button id="openAdmin" class="btn ghost">Admin</button>
+  </div>
+</header>
+
+<main>
+  <section id="grid" aria-live="polite"></section>
+
+  <div id="emptyMsg" class="empty" style="display:none;margin-top:1rem">
+    Aucune source trouvée. Essaie d'en importer un <button id="openAdmin2" class="btn">ouvrir admin</button>
+  </div>
+
+  <div id="detail" aria-hidden="true">
+    <header>
+      <h3 id="detailTitle">Détails</h3>
+      <div><button id="closeDetail" class="btn ghost">Fermer</button></div>
+    </header>
+    <div id="callsList"></div>
+    <footer class="note">Clique sur un appel pour ouvrir la page projet dans un nouvel onglet.</footer>
+  </div>
+
+  <!-- Admin -->
+  <section id="admin" class="admin-panel" aria-hidden="true">
+    <h2>Admin — Éditeur JSON</h2>
+    <div class="row">
+      <button id="importSample" class="btn">Charger exemple</button>
+      <button id="loadRemote" class="btn ghost">Charger data.json (repo)</button>
+      <button id="exportJson" class="btn">Exporter JSON</button>
+      <button id="applyJson" class="btn ghost">Appliquer JSON (dans la page)</button>
+    </div>
+
+    <p class="small">Édite ici le JSON puis clique <strong>Appliquer JSON</strong>. Pour sauvegarder dans le repo : Exporter JSON → commit dans GitHub (ou remplacer data.json).</p>
+
+    <textarea id="jsonEdit" class="json-edit" spellcheck="false"></textarea>
+
+    <hr style="margin:1rem 0">
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <button id="openFormAddSource" class="btn">+ Nouvelle source</button>
+      <button id="clearAll" class="btn ghost">Tout supprimer</button>
+    </div>
+
+    <div id="adminSub" style="margin-top:1rem"></div>
+  </section>
+</main>
+
+<script>
+/*
+ Single-file prototype:
+ - Loads data from /data.json if present (same repo)
+ - Data model:
+   sources: [
+     {
+       id: "uuid-or-slug",
+       name: "Nom de la source",
+       desc: "une courte description",
+       url: "https://...",
+       tags: ["subvention","culture"],
+       calls: [
+         { id:"c1", title:"Appel X", deadline:"2025-12-01", url:"https://...", tags:["tag1","tag2"], note:"" }
+       ]
+     }
+   ]
+ - Public view shows source cards; click -> detail list of calls
+ - Admin view (#admin) allows loading remote data.json, editing JSON, importing sample, exporting JSON file
+ - NOTE: export just downloads the JSON; to persist in GitHub Pages you must commit/update data.json in repo
+*/
+
+const DEFAULT_DATA = {
+  sources: [
+    {
+      id: "organisme-exemple",
+      name: "Organisme Exemple",
+      desc: "Bourse / Appels pour projets test",
+      url: "https://example.org",
+      tags: ["culture","innovation"],
+      calls: [
+        { id:"call-1", title:"Appel à projets — Innovation sociale", deadline:"2025-12-15", url:"https://example.org/call1", tags:["innovation","social"], note:"Montant : 10k€" },
+        { id:"call-2", title:"Concours création", deadline:"2025-11-30", url:"https://example.org/c2", tags:["creation","culture"], note:"Ouvert aux startups" }
+      ]
+    },
+    {
+      id: "fondation-xyz",
+      name: "Fondation XYZ",
+      desc: "Aides pour initiatives locales",
+      url: "https://fondation.xyz",
+      tags: ["local"],
+      calls: [
+        { id:"fxyz-1", title:"Aide projet local", deadline:"2025-10-20", url:"https://fondation.xyz/projet", tags:["local","subvention"], note:"Dépôt en ligne" }
+      ]
+    }
+  ]
+};
+
+let DATA = DEFAULT_DATA; // in-memory
+const grid = document.getElementById('grid');
+const q = document.getElementById('q');
+const tagFilter = document.getElementById('tagFilter');
+const emptyMsg = document.getElementById('emptyMsg');
+
+async function tryLoadRemote() {
+  try {
+    const resp = await fetch('data.json', {cache: "no-store"});
+    if(!resp.ok) { throw new Error('no remote data.json'); }
+    const json = await resp.json();
+    DATA = json;
+    applyData(DATA);
+    console.log('Loaded remote data.json');
+    return true;
+  } catch(e) {
+    console.log('No remote data.json or failed to load:', e.message);
+    return false;
+  }
+}
+
+function uniq(arr){ return Array.from(new Set(arr || [])); }
+
+function collectAllTags(data){
+  const t = [];
+  (data.sources||[]).forEach(s=>{
+    (s.tags||[]).forEach(x=>t.push(x));
+    (s.calls||[]).forEach(c=> (c.tags||[]).forEach(x=>t.push(x)));
+  });
+  return uniq(t).sort();
+}
+
+function renderGrid(data, query='', tag='') {
+  const list = data.sources || [];
+  const ql = (query||'').toLowerCase().trim();
+  const filtered = list.filter(s=>{
+    if(tag){
+      if(!((s.tags||[]).includes(tag) || (s.calls||[]).some(c=> (c.tags||[]).includes(tag)))) return false;
+    }
+    if(!ql) return true;
+    const hay = ((s.name||'') + ' ' + (s.desc||'') + ' ' + ((s.tags||[]).join(' ')) + ' ' + ((s.calls||[]).map(c=>c.title).join(' '))).toLowerCase();
+    return hay.includes(ql);
+  });
+  grid.innerHTML = '';
+  if(!filtered.length){
+    emptyMsg.style.display='block';
+  } else {
+    emptyMsg.style.display='none';
+  }
+  filtered.forEach(s=>{
+    const el = document.createElement('article');
+    el.className='source-card';
+    el.innerHTML = `<h3>${escapeHtml(s.name)}</h3>
+      <p>${escapeHtml(s.desc || '')}</p>
+      <div class="meta">
+        <a href="${escapeAttr(s.url||'#')}" target="_blank" class="small">${shortUrl(s.url)}</a>
+        ${(s.tags||[]).slice(0,4).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}
+      </div>`;
+    el.addEventListener('click',()=>openDetail(s));
+    grid.appendChild(el);
+  });
+  populateTagFilter();
+}
+
+function populateTagFilter(){
+  const tags = collectAllTags(DATA);
+  tagFilter.innerHTML = '<option value="">Tous tags</option>' + tags.map(t=>`<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('');
+}
+
+function shortUrl(u){
+  try{
+    if(!u) return '';
+    const p = new URL(u);
+    return p.hostname.replace('www.','');
+  }catch(e){ return u || ''; }
+}
+
+function openDetail(source){
+  const detail = document.getElementById('detail');
+  document.getElementById('detailTitle').textContent = source.name;
+  const callsList = document.getElementById('callsList');
+  callsList.innerHTML = '';
+  (source.calls || []).sort((a,b)=> new Date(a.deadline||0)-new Date(b.deadline||0)).forEach(c=>{
+    const n = document.createElement('div');
+    n.className = 'call';
+    n.innerHTML = `<h4>${escapeHtml(c.title)}</h4>
+      <div class="small">${c.deadline ? 'Date limite: ' + escapeHtml(c.deadline) : ''}</div>
+      <div class="meta">${(c.tags||[]).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>
+      <div style="margin-top:.5rem"><a href="${escapeAttr(c.url||'#')}" target="_blank" class="btn ghost">Voir la page</a></div>
+      ${c.note?`<div style="margin-top:.6rem;color:var(--muted)">${escapeHtml(c.note)}</div>`:''}
+    `;
+    callsList.appendChild(n);
+  });
+  detail.classList.add('open');
+  detail.setAttribute('aria-hidden','false');
+}
+
+document.getElementById('closeDetail').addEventListener('click',()=>{
+  const detail = document.getElementById('detail');
+  detail.classList.remove('open');
+  detail.setAttribute('aria-hidden','true');
+});
+
+// search & filter
+q.addEventListener('input', ()=> renderGrid(DATA, q.value, tagFilter.value));
+tagFilter.addEventListener('change', ()=> renderGrid(DATA, q.value, tagFilter.value));
+
+// utilities for safe HTML
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return (String(s||'').replace(/"/g,'&quot;')); }
+
+// Admin toggling
+const adminPanel = document.getElementById('admin');
+const openAdminBtn = document.getElementById('openAdmin');
+const openAdminBtn2 = document.getElementById('openAdmin2');
+openAdminBtn.addEventListener('click', toggleAdmin);
+openAdminBtn2.addEventListener('click', ()=>{ window.location.hash = '#admin'; toggleAdmin(); });
+
+function toggleAdmin(){
+  const mode = window.location.hash === '#admin';
+  if(!mode){
+    window.location.hash = '#admin';
+  } else {
+    window.location.hash = '';
+  }
+  applyHashMode();
+}
+
+function applyHashMode(){
+  const isAdmin = window.location.hash === '#admin';
+  if(isAdmin){
+    adminPanel.classList.add('open');
+    adminPanel.setAttribute('aria-hidden','false');
+    document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+    window.scrollTo({top:0,behavior:'smooth'});
+  } else {
+    adminPanel.classList.remove('open');
+    adminPanel.setAttribute('aria-hidden','true');
+  }
+}
+window.addEventListener('hashchange', applyHashMode);
+
+// admin actions
+document.getElementById('importSample').addEventListener('click', ()=>{
+  DATA = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+  renderGrid(DATA, q.value, tagFilter.value);
+});
+document.getElementById('loadRemote').addEventListener('click', async ()=>{
+  const ok = await tryLoadRemote();
+  if(ok) {
+    alert('data.json chargé depuis le repo (si présent).');
+    document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+    renderGrid(DATA, q.value, tagFilter.value);
+  } else {
+    alert('Aucun data.json accessible (ou erreur).');
+  }
+});
+
+document.getElementById('applyJson').addEventListener('click', ()=>{
+  const t = document.getElementById('jsonEdit').value;
+  try{
+    const parsed = JSON.parse(t);
+    DATA = parsed;
+    renderGrid(DATA, q.value, tagFilter.value);
+    alert('JSON appliqué dans la page (en mémoire).');
+  }catch(e){ alert('JSON invalide: ' + e.message); }
+});
+
+document.getElementById('exportJson').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'data.json'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+});
+
+document.getElementById('clearAll').addEventListener('click', ()=>{
+  if(!confirm('Supprimer toutes les sources (localement) ?')) return;
+  DATA = { sources: [] };
+  document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+  renderGrid(DATA, q.value, tagFilter.value);
+});
+
+document.getElementById('openFormAddSource').addEventListener('click', ()=>{
+  showSourceForm();
+});
+
+const adminSub = document.getElementById('adminSub');
+
+function showSourceForm(existing){
+  adminSub.innerHTML = '';
+  const s = existing || { id: 'id-'+Date.now(), name:'', desc:'', url:'', tags:[], calls:[] };
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div style="display:flex;gap:.5rem;flex-direction:column">
+      <input id="s_name" placeholder="Nom de la source" value="${escapeAttr(s.name||'')}" />
+      <input id="s_desc" placeholder="Courte description" value="${escapeAttr(s.desc||'')}" />
+      <input id="s_url" placeholder="URL (site org)" value="${escapeAttr(s.url||'')}" />
+      <input id="s_tags" placeholder="tags (séparés par ,)" value="${escapeAttr((s.tags||[]).join(','))}" />
+      <div style="display:flex;gap:.5rem">
+        <button id="saveSrc" class="btn">Enregistrer source</button>
+        <button id="cancelSrc" class="btn ghost">Annuler</button>
+      </div>
+      <div style="margin-top:.6rem">
+        <h4>Appels existants</h4>
+        <div id="callsListAdmin"></div>
+        <button id="addCallBtn" class="btn ghost" style="margin-top:.5rem">+ Ajouter un appel</button>
+      </div>
+    </div>
+  `;
+  adminSub.appendChild(wrap);
+
+  const callsListAdmin = wrap.querySelector('#callsListAdmin');
+
+  function renderAdminCalls(){
+    callsListAdmin.innerHTML = (s.calls||[]).map(c=>`
+      <div style="border:1px solid rgba(2,6,23,.04);padding:.5rem;border-radius:8px;margin-bottom:.4rem">
+        <strong>${escapeHtml(c.title)}</strong>
+        <div class="small">${escapeHtml(c.deadline || '')} — <a href="${escapeAttr(c.url||'#')}" target="_blank">${shortUrl(c.url)}</a></div>
+        <div style="margin-top:.4rem"><button data-id="${escapeAttr(c.id)}" class="editCall btn ghost">Edit</button> <button data-id="${escapeAttr(c.id)}" class="delCall btn">Delete</button></div>
+      </div>
+    `).join('') || '<div class="small">Aucun appel</div>';
+  }
+  renderAdminCalls();
+
+  wrap.querySelector('#addCallBtn').addEventListener('click', ()=>{
+    showCallForm(s, null,(rendered)=>{ s.calls = s.calls || []; s.calls.push(rendered); renderAdminCalls(); });
+  });
+
+  wrap.querySelector('#saveSrc').addEventListener('click', ()=>{
+    const name = wrap.querySelector('#s_name').value.trim();
+    if(!name){ alert('Nom requis'); return; }
+    s.name = name;
+    s.desc = wrap.querySelector('#s_desc').value.trim();
+    s.url = wrap.querySelector('#s_url').value.trim();
+    s.tags = (wrap.querySelector('#s_tags').value.trim()||'').split(',').map(t=>t.trim()).filter(Boolean);
+    // upsert into DATA
+    DATA.sources = DATA.sources || [];
+    const idx = DATA.sources.findIndex(x=>x.id === s.id);
+    if(idx>=0) DATA.sources[idx]=s; else DATA.sources.push(s);
+    document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+    renderGrid(DATA, q.value, tagFilter.value);
+    alert('Source enregistrée (en mémoire). N’oublie pas Exporter JSON pour sauvegarder.');
+  });
+
+  wrap.querySelector('#cancelSrc').addEventListener('click', ()=>{ adminSub.innerHTML=''; });
+  
+  // edit/delete call handlers (delegation)
+  callsListAdmin.addEventListener('click', (ev)=>{
+    const t = ev.target;
+    if(t.classList.contains('editCall')){
+      const id = t.dataset.id;
+      const call = (s.calls||[]).find(c=>c.id===id);
+      showCallForm(s, call, (updated)=>{ Object.assign(call, updated); renderAdminCalls(); });
+    } else if(t.classList.contains('delCall')){
+      const id = t.dataset.id;
+      if(confirm('Supprimer cet appel ?')){
+        s.calls = (s.calls||[]).filter(c=>c.id!==id);
+        renderAdminCalls();
+        document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+      }
+    }
+  });
+}
+
+function showCallForm(source, existingCall, cb){
+  const modal = document.createElement('div');
+  modal.style = 'background:#fff;border:1px solid rgba(2,6,23,.06);padding:1rem;border-radius:10px;margin-top:.6rem';
+  const c = existingCall || { id:'call-'+Date.now(), title:'', deadline:'', url:'', tags:[], note:'' };
+  modal.innerHTML = `
+    <input id="c_title" placeholder="Titre de l'appel" value="${escapeAttr(c.title||'')}" />
+    <input id="c_deadline" placeholder="Date limite YYYY-MM-DD" value="${escapeAttr(c.deadline||'')}" />
+    <input id="c_url" placeholder="URL page projet" value="${escapeAttr(c.url||'')}" />
+    <input id="c_tags" placeholder="tags (séparés par ,)" value="${escapeAttr((c.tags||[]).join(','))}" />
+    <textarea id="c_note" placeholder="Note/infos" style="min-height:80px">${escapeAttr(c.note||'')}</textarea>
+    <div style="display:flex;gap:.5rem;margin-top:.4rem">
+      <button id="saveCall" class="btn">Enregistrer</button>
+      <button id="cancelCall" class="btn ghost">Annuler</button>
+    </div>
+  `;
+  const parent = adminSub;
+  parent.appendChild(modal);
+  modal.querySelector('#saveCall').addEventListener('click', ()=>{
+    const updated = {
+      id: c.id,
+      title: modal.querySelector('#c_title').value.trim(),
+      deadline: modal.querySelector('#c_deadline').value.trim(),
+      url: modal.querySelector('#c_url').value.trim(),
+      tags: (modal.querySelector('#c_tags').value.trim()||'').split(',').map(t=>t.trim()).filter(Boolean),
+      note: modal.querySelector('#c_note').value.trim()
+    };
+    if(!updated.title){ alert('Titre requis'); return; }
+    cb(updated);
+    parent.removeChild(modal);
+    document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+  });
+  modal.querySelector('#cancelCall').addEventListener('click', ()=> parent.removeChild(modal));
+}
+
+// initial load: try remote data.json, else default
+(async function init(){
+  const ok = await tryLoadRemote();
+  if(!ok) {
+    DATA = DEFAULT_DATA;
+  }
+  renderGrid(DATA, q.value, '');
+  // fill json editor
+  document.getElementById('jsonEdit').value = JSON.stringify(DATA, null, 2);
+})();
+
+// helper to download / commit: user must commit data.json in repo manually
+</script>
+</body>
+</html>
