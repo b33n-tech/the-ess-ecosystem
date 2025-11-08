@@ -1,56 +1,81 @@
 body {
   font-family: system-ui, sans-serif;
-  background: #f9fafb;
+  background: #f0f2f5;
   color: #222;
   margin: 0;
-  padding: 1.5rem;
+  padding: 2rem;
 }
 
 h1 {
   text-align: center;
   margin-bottom: 2rem;
+  color: #1f2937;
 }
 
 #cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
 }
 
-/* Admin */
-#admin-container {
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  padding: 1.2rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-#json-editor {
-  width: 90%;
-  height: 70vh;
-  font-family: monospace;
-  font-size: 0.9rem;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  padding: 1rem;
-  resize: none;
-  background: #fff;
-}
-
-.buttons {
-  display: flex;
-  gap: 1rem;
-}
-
-button {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
 }
 
-button:hover {
-  background: #1e40af;
+.card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.card h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+.card p {
+  margin: 0.3rem 0;
+  font-size: 0.95rem;
+}
+
+.tag {
+  display: inline-block;
+  background: #e0e7ff;
+  color: #1e3a8a;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 2px 2px 2px 0;
+  font-size: 0.75rem;
+  transition: background 0.2s;
+}
+
+.tag:hover {
+  background: #c7d2fe;
+}
+
+.call {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+}
+
+.call p {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.call a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.call a:hover {
+  text-decoration: underline;
 }
